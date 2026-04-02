@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.png" alt="GAJ - Get A Job" width="400">
+  <img src="assets/terminal.svg" alt="GAJ - Get A Job" width="400">
 </p>
 
 <p align="center">by <a href="https://stackproof.app">StackProof</a></p>
