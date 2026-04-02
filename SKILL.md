@@ -58,33 +58,64 @@ If the database does not exist, run the first-run setup:
    # About Me
 
    ## Target roles
-   <!-- e.g., Senior Software Engineer, Staff Engineer, Engineering Manager -->
 
-   ## Salary floor
-   <!-- e.g., $180,000 base (W-2) -->
+   ## Employment type preferences
+
+   ## Compensation floors
 
    ## Preferred tech stack
-   <!-- e.g., TypeScript, React, Node.js, PostgreSQL -->
 
    ## Evaluation criteria
-   <!-- What matters most: remote work, team size, product domain, growth path -->
 
    ## Location preferences
-   <!-- e.g., Remote only, SF Bay Area, open to relocation -->
+
+   ## Company size preference
 
    ## Key achievements
-   <!-- 2-3 quantified achievements for cover letters and recruiter responses -->
+
+   ## Resume variants
+
+   ## Contact
    ```
 
-5. Deploy command stubs for autocomplete:
+5. Begin guided profile creation:
+
+   Present:
+   > Your profile helps GAJ personalize everything: which jobs to pursue, what to say to recruiters, and how to negotiate.
+   >
+   > Got a resume handy? Drop it here (PDF, markdown, or paste text). Or type "skip" and I'll ask a few questions instead.
+
+   **If resume provided:**
+   - Extract: target roles, tech stack, key achievements
+   - Show extracted profile: "Here's what I found. I'll fill this in and ask about the rest."
+   - Write extracted fields to the about-me.md draft
+
+   **If skipped:**
+   - Proceed directly to the questions below
+
+6. Ask what the resume can't tell us (one at a time, short answers):
+
+   1. "What roles are you targeting?" (skip if extracted from resume)
+   2. "Open to W-2 salaried, contract-to-hire, 1099, or all three?"
+   3. "What's your salary floor?" (prompt per type based on answer to #2)
+   4. "Remote only, hybrid, on-site, or flexible?"
+   5. "Any company size or stage preference?"
+   6. "What matters most to you beyond compensation? Pick your top 2-3: team quality, tech stack, product domain, growth path, mission, work-life balance, company reputation"
+   7. "Do you use different resume versions for different roles? If so, where are they?" (only ask if resume was provided)
+   8. "What email should outbound messages sign off with?"
+
+7. Show the completed profile. Ask: "Anything to change? Otherwise I'll save this."
+   Write to `~/gaj/context/about-me.md`.
+
+8. Deploy command stubs for autocomplete:
    ```bash
    mkdir -p ~/.claude/commands/gaj && cp commands/*.md ~/.claude/commands/gaj/
    ```
 
-6. Show the onboarding guide:
+9. Show the onboarding guide:
 
    ```
-   Setup complete. Here's what you can do:
+   Profile saved. Here's what you can do:
 
    Pipeline commands:
      /gaj:add              Add a job to the pipeline
@@ -101,11 +132,11 @@ If the database does not exist, run the first-run setup:
    Workflow commands:
      /gaj:triage           Batch-filter a job alert digest
      /gaj:sync             Export pipeline to Google Sheets
+     /gaj:profile          View or update your search profile
 
    Start here:
-     1. Fill in ~/gaj/context/about-me.md (targets, salary floor, achievements)
-     2. /gaj:add to add your first job
-     3. /gaj:help any time to see this reference again
+     1. /gaj:add to add your first job
+     2. /gaj:help any time to see this reference again
    ```
 
 Then stop. Do not attempt other pipeline operations until setup completes.
