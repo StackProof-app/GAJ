@@ -76,10 +76,37 @@ If the database does not exist, run the first-run setup:
    <!-- 2-3 quantified achievements for cover letters and recruiter responses -->
    ```
 
-5. Tell the user:
-   > Database ready. Fill in `~/gaj/context/about-me.md` for personalized cover letters and recruiter responses. Google Sheets sync is optional, configure in `~/gaj/config.yaml`.
+5. Deploy command stubs for autocomplete:
+   ```bash
+   mkdir -p ~/.claude/commands/gaj && cp commands/*.md ~/.claude/commands/gaj/
+   ```
 
-6. Run `gaj:stats` to show the empty pipeline dashboard.
+6. Show the onboarding guide:
+
+   ```
+   Setup complete. Here's what you can do:
+
+   Pipeline commands:
+     /gaj:add              Add a job to the pipeline
+     /gaj:list             List/filter pipeline items
+     /gaj:status           Update a job's status
+     /gaj:search           Search by company, title, or keyword
+     /gaj:stats            Pipeline statistics
+
+   Generation commands:
+     /gaj:cover-letter     Generate a Hook/Proof/Close cover letter
+     /gaj:respond          Assess interest and draft a recruiter response
+     /gaj:negotiate        Ackerman-based salary negotiation guidance
+
+   Workflow commands:
+     /gaj:triage           Batch-filter a job alert digest
+     /gaj:sync             Export pipeline to Google Sheets
+
+   Start here:
+     1. Fill in ~/gaj/context/about-me.md (targets, salary floor, achievements)
+     2. /gaj:add to add your first job
+     3. /gaj:help any time to see this reference again
+   ```
 
 Then stop. Do not attempt other pipeline operations until setup completes.
 
@@ -103,7 +130,7 @@ When the user gives a natural language instruction, route to the correct sub-com
 | "Triage these jobs" or "Filter this digest" or pastes multiple jobs | `gaj:triage` |
 | "Here's a LinkedIn alert" or "Batch these" or "Inbox buildup" | `gaj:triage` |
 
-If the user invokes `/gaj` without a specific task, run `gaj:stats` and present a pipeline dashboard.
+If the user invokes `/gaj` without a specific task, run `gaj:stats` and present a pipeline dashboard. After the dashboard, add: "Run /gaj:help for the full command reference."
 
 ## CLI tool
 
