@@ -1,11 +1,11 @@
 ---
 name: gaj
 description: |
-  Manage your entire job search from Claude Code. Track opportunities, draft recruiter
-  responses, generate cover letters, negotiate salary, triage job alert digests, and run
-  detective research on every opportunity. Triggers on /gaj, job pipeline, job search,
-  add a job, respond to recruiter, cover letter, negotiate salary, triage inbox, pipeline
-  status, or any job search management request.
+  Run your entire job search from the terminal. Investigates every recruiter and company
+  before you respond, deduces unnamed clients from staffing firms, drafts calibrated
+  responses, generates cover letters, and negotiates salary with market data. Triggers
+  on /gaj, job pipeline, job search, add a job, respond to recruiter, cover letter,
+  negotiate salary, triage inbox, pipeline status, or any job search management request.
 ---
 
 When this skill loads, display the banner:
@@ -129,6 +129,7 @@ When the user gives a natural language instruction, route to the correct sub-com
 | "Sync to sheets" or "Export pipeline" | `gaj:sync` |
 | "Triage these jobs" or "Filter this digest" or pastes multiple jobs | `gaj:triage` |
 | "Here's a LinkedIn alert" or "Batch these" or "Inbox buildup" | `gaj:triage` |
+| "Update my profile" or "Change my targets" or "Edit about-me" | `gaj:profile` |
 
 If the user invokes `/gaj` without a specific task, run `gaj:stats` and present a pipeline dashboard. After the dashboard, add: "Run /gaj:help for the full command reference."
 
