@@ -127,6 +127,7 @@ If the database does not exist, run the first-run setup:
    Generation commands:
      /gaj:cover-letter     Generate a Hook/Proof/Close cover letter
      /gaj:respond          Assess interest and draft a recruiter response
+     /gaj:sherlock         Deep investigation on a company, recruiter, or listing
      /gaj:negotiate        Ackerman-based salary negotiation guidance
 
    Workflow commands:
@@ -156,6 +157,7 @@ When the user gives a natural language instruction, route to the correct sub-com
 | "How many jobs?" or "Pipeline stats" | `gaj:stats` |
 | "Write a cover letter for [company]" or "Draft a letter" | `gaj:cover-letter` |
 | "Reply to recruiter" or "Respond to [name]" | `gaj:respond` |
+| "Investigate [company]" or "Sherlock [anything]" or "Is [company] legit" | `gaj:sherlock` |
 | "Negotiate salary" or "Counter offer for [company]" | `gaj:negotiate` |
 | "Sync to sheets" or "Export pipeline" | `gaj:sync` |
 | "Triage these jobs" or "Filter this digest" or pastes multiple jobs | `gaj:triage` |

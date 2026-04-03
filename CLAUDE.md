@@ -31,6 +31,7 @@ A unified Claude Code skill for engineers managing their job search. Pipeline tr
 | `/gaj:stats` | Pipeline statistics |
 | `/gaj:cover-letter` | Generate Hook/Proof/Close cover letter |
 | `/gaj:respond` | Assess interest and draft recruiter response |
+| `/gaj:sherlock` | Deep investigation on a company, recruiter, or listing |
 | `/gaj:negotiate` | Ackerman-based salary negotiation |
 | `/gaj:sync` | Export to Google Sheets |
 
