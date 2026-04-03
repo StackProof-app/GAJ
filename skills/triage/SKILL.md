@@ -1,188 +1,265 @@
 ---
 name: gaj:triage
 description: |
-  Batch-triage job alert digests from LinkedIn or email. Triggers on /gaj:triage,
-  "triage my inbox", "filter these jobs", "here's a digest", "LinkedIn alerts",
-  "batch these jobs", or when the user pastes multiple job listings at once.
+  Batch-triage pipeline items or job alert digests using tiered AI models.
+  Triggers on /gaj:triage, "triage my pipeline", "filter these jobs",
+  "here's a digest", "LinkedIn alerts", "batch these jobs".
 ---
 
-# gaj:triage - Batch Job Triage
+# gaj:triage - Batch pipeline triage
 
-Score, filter, and surface the signal from high-volume job alert digests. This is for
-inbox buildup and tidal waves. For a single specific job, use `gaj:add` instead.
+Score, filter, and surface signal from the pipeline or fresh job alert digests. Uses tiered models: Haiku for bulk classification, Sonnet for uncertain review, Opus for presentation and decisions.
 
 ## When to use
 
-- User pastes a LinkedIn job alert digest (3-4+ jobs in one email)
-- User has multiple job listings to evaluate at once
-- User says "triage", "filter these", "batch", or "inbox buildup"
-- User forwards or pastes any multi-job email
+- User says "triage", "filter", "batch", "clean up my pipeline"
+- User pastes a LinkedIn digest, job alert email, or list of jobs
+- User has multiple pending-review items to evaluate at once
 
-## Process
+## Config
 
-### Step 1: Extract all jobs from the digest
+Read `~/gaj/gaj.json` at start. Required fields:
 
-Parse the user's input and extract every job listing. For each job, capture whatever
-is visible in the digest:
-
-| Field | Source |
-|-------|--------|
-| Job title | Digest text |
-| Company name | Digest text |
-| Location / remote | Digest text |
-| Salary (if shown) | Digest text |
-| URL | LinkedIn link if present |
-| Source | `linkedin-alert`, `job-board`, etc. |
-
-Present the raw extraction as a numbered list so the user can verify nothing was missed.
-
-### Step 2: Quick score each job (30 seconds per job, no deep research)
-
-Apply the scoring rubric to each job using ONLY information visible in the digest
-plus basic knowledge (is the company public? is it a known startup?). Do NOT run
-full detective research at this stage.
-
-**Scoring rubric (0-10 weighted)**
-
-| Criteria | Weight | What it measures |
-|----------|--------|-----------------|
-| Role fit | 2x | Senior/staff level, AI/ML/LLM in scope, engineering not support |
-| Stack match | 1x | TypeScript, Python, React, distributed systems, AI frameworks |
-| Company quality | 1.5x | Known stage, funding, reputation (surface-level only) |
-| Comp signal | 1x | Above $180k floor, or unstated (benefit of doubt = 5/10) |
-| Strategic value | 1.5x | Resume impact, springboard potential, market positioning |
-
-**Scoring guidelines:**
-- Unstated salary gets a neutral 5/10 (benefit of doubt, will clarify later)
-- European remote roles get a strategic value bonus if the role involves real AI work
-  (thinner talent pool = easier placement = springboard potential)
-- "Junior" or "Mid" in title = automatic 0/10 on role fit
-- On-site only with no relocation interest = 2/10 on role fit
-- Known Series B+ or F500 with AI initiative = 8/10 on company quality
-- Unknown company = 5/10 on company quality (neutral, not penalized)
-
-**Calculate weighted score:**
-```
-score = (role_fit * 2 + stack_match * 1 + company_quality * 1.5 + comp * 1 + strategic * 1.5) / 7
+```json
+{
+  "models": {
+    "triage": "claude-haiku-...",
+    "triage_review": "claude-sonnet-..."
+  },
+  "blacklist": {
+    "companies": ["string patterns"],
+    "titles": ["string patterns"]
+  },
+  "profile": { ... },
+  "compensation": {
+    "w2_salaried": { "floor": 180000 }
+  },
+  "cli": {
+    "working_directory": "/path/to/pipeline"
+  }
+}
 ```
 
-### Step 3: Present the triage table
+If `gaj.json` is missing or fields are absent, use these defaults: triage model = haiku, triage_review model = sonnet.
 
-Sort by score descending. Color-code the recommendation:
+## Step 0: Determine input source
+
+**Pipeline mode (default):** Triage existing pending-review items.
+
+```bash
+cd "$working_directory" && npx tsx scripts/pipeline-cli.ts list pending-review
+```
+
+**Digest mode:** User has pasted a block of job listings. Extract each job, check against the blacklist before adding, add clean entries via CLI, then run pipeline mode on the newly added items.
+
+If no items are found in pipeline mode, tell the user the pipeline is clean and exit.
+
+## Step 1: Blacklist pass (no AI)
+
+Check each item's `company_name` and `job_title` against `gaj.json blacklist.companies` and `blacklist.titles`. Matching is case-insensitive substring.
+
+For each match, update the item status to `filtered-match` via CLI with a short reason (e.g., "blacklist: company pattern 'staffing'").
+
+```bash
+cd "$working_directory" && npx tsx scripts/pipeline-cli.ts status <id> filtered-match --reason "blacklist: <pattern>"
+```
+
+Report a summary: how many items matched per pattern. If nothing remains after this pass, skip to Step 5.
+
+## Step 2: Haiku bulk classification
+
+Split remaining items into batches of 25. One subagent per batch.
+
+| Items | Subagents |
+|-------|-----------|
+| 1-25 | 1 |
+| 26-50 | 2 |
+| 51-75 | 3 |
+
+Spawn subagents in parallel using `models.triage` (default: haiku). Each subagent receives:
+
+- The jobs batch as a JSON array
+- The user profile summary
+- The scoring rubric
+
+**Haiku subagent prompt template:**
+
+```
+You are a job triage classifier. Score each job against this candidate profile and return ONLY a JSON array. No markdown. No explanation. No wrapper text.
+
+CANDIDATE PROFILE
+Target roles: {profile.target_roles}
+Preferred stack: {profile.preferred_stack}
+Location preference: {profile.location_preference}
+Comp floor (W2 salaried): ${compensation.w2_salaried.floor}
+
+SCORING RUBRIC
+Score each criterion 0-10, then compute weighted score:
+  score = (role_fit*2 + stack*1 + company*1.5 + comp*1 + strategic*1.5) / 7
+
+Criteria:
+- role_fit (2x): Senior/staff level, AI/ML/LLM in scope, engineering not support. Junior/Mid in title = 0. On-site only = 2.
+- stack (1x): TypeScript, Python, React, distributed systems, AI frameworks.
+- company (1.5x): Known stage/funding/reputation. Unknown company = 5 (neutral). Known Series B+ with AI initiative = 8+.
+- comp (1x): Above floor = 8+. Unstated = 5 (benefit of the doubt). Below floor = 0-3.
+- strategic (1.5x): Resume impact, springboard potential, market positioning. European remote with real AI work gets a bonus.
+
+VERDICT RULES
+- score >= 7.0: verdict = "keep"
+- score >= 4.5 and < 7.0: verdict = "uncertain"
+- score < 4.5: verdict = "skip"
+
+JOBS TO CLASSIFY
+{jobs_json}
+
+Return ONLY this JSON array, no other text:
+[
+  { "id": "<job_id>", "verdict": "keep|skip|uncertain", "score": 7.2, "reason": "one line explanation" }
+]
+```
+
+After all subagents return, collect results. Update each SKIP item to status `filtered` with the subagent's reason:
+
+```bash
+cd "$working_directory" && npx tsx scripts/pipeline-cli.ts status <id> filtered --reason "<reason>"
+```
+
+## Step 3: Sonnet uncertain review
+
+Collect all UNCERTAIN items from Step 2 into a single subagent call using `models.triage_review` (default: sonnet).
+
+**Sonnet subagent prompt template:**
+
+```
+You are a senior job search advisor reviewing borderline job matches. The candidate has already been through a first-pass classifier. These items were flagged as uncertain. Make a final keep/skip call for each.
+
+CANDIDATE PROFILE
+Target roles: {profile.target_roles}
+Preferred stack: {profile.preferred_stack}
+Location preference: {profile.location_preference}
+Comp floor (W2 salaried): ${compensation.w2_salaried.floor}
+
+UNCERTAIN ITEMS (include Haiku's score and reason for context)
+{uncertain_jobs_json}
+
+Each item in uncertain_jobs_json includes:
+- id, company_name, job_title, location, salary_range, source
+- haiku_score: the first-pass score
+- haiku_reason: the first-pass reasoning
+
+Apply the same scoring rubric. Use your judgment on edge cases. If a role is ambiguous but has strong upside signal (e.g., unusual comp, rare company, direct inbound), lean keep.
+
+Return ONLY this JSON array, no other text:
+[
+  { "id": "<job_id>", "verdict": "keep|skip", "score": 6.8, "reason": "one line final reasoning" }
+]
+```
+
+Update SKIP items from this pass to `filtered` status. KEEP items remain in `pending-review` for Step 4.
+
+## Step 4: Present results
+
+Collect all KEEPs from Steps 2 and 3. Sort by score descending.
 
 ```
 TRIAGE RESULTS
 ==============
 
-| # | Score | Company | Role | Signal | Action |
+| # | Score | Company | Role | Source | Signal |
 |---|-------|---------|------|--------|--------|
-| 1 | 8.2 | Acme AI | Staff AI Engineer | Series B, remote, $200k | PURSUE |
-| 2 | 7.1 | DataCorp | Senior ML Eng | F500, remote, no salary | PURSUE |
-| 3 | 5.4 | MedWidget | AI Developer | Seed, hybrid, $140k | MAYBE |
-| 4 | 3.1 | BuzzCo | Mid Engineer | Unknown, on-site | SKIP |
-| 5 | 1.8 | StaffHaus | Jr Developer | Staffing, contract | SKIP |
+| 1 | 8.4   | Acme AI | Staff AI Engineer | linkedin | Series B, remote, $200k |
+| 2 | 7.1   | DataCorp | Senior ML Eng | email | F500, remote, unstated |
 
-PURSUE (7+): Full detective research + pipeline ingestion
-MAYBE (4-6): One-liner in table. Promote to PURSUE if you want.
-SKIP (0-3): Auto-filtered. Reason noted.
+Filtered: 12 (8 blacklist, 3 Haiku skip, 1 Sonnet skip)
+Kept for review: 2
 ```
 
-### Step 4: User picks
+Ask the user which items they want a full sherlock investigation on. Options: "all", specific numbers ("1, 3"), or "top N".
 
-Ask the user: "Which ones do you want the full detective report on? I recommend
-the PURSUE entries. You can also promote any MAYBE."
+Wait for user input before proceeding.
 
-The user can:
-- Approve all PURSUE entries: "run them all"
-- Cherry-pick: "do 1 and 3"
-- Override: "skip 2, promote 4"
-- Add context: "I know someone at DataCorp, bump that one"
+## Step 5: Archive sweep
 
-### Step 5: Detective research on picks (parallel)
+After the user has made their selections (or if there was nothing to keep), run the archive command to move stale closed items out of the active view.
 
-For each picked job, run the full detective research from `gaj:add` Step 0:
-- Company research (funding, tech stack, AI investment, Glassdoor)
-- Compensation reality check
-- Stack and role fit analysis
+```bash
+cd "$working_directory" && npx tsx scripts/pipeline-cli.ts archive
+```
 
-Launch research agents in parallel for all picked jobs simultaneously.
+Report final counts: active, filtered, archived.
 
-**CRITICAL: Detective research is a secret weapon for the user only.** Never reveal
-research findings in any outbound communication. The edge only works if it stays hidden.
+---
 
-### Step 6: Present detective reports + ingest
+## Digest extraction (digest mode only)
 
-For each researched job, present:
-1. Detective report with evidence table
-2. Interest assessment (strong interest / curious / warm decline)
-3. Draft response if the user wants one (via `gaj:respond` flow)
+When the user pastes a block of content rather than triggering pipeline mode:
 
-Ingest all researched jobs into the pipeline via `gaj:add` CLI command.
-Store research findings in the `job_data` field.
+1. Parse the input. Extract every distinct job listing. Look for: job title, company name, location, salary (if stated), URL or source.
+2. Present the raw extraction as a numbered list. Ask the user to confirm before adding anything.
+3. Check each extracted job against the blacklist before adding. Skip any blacklist matches and note them.
+4. Add clean jobs via CLI:
 
-### Step 7: Handle the SKIPs
+```bash
+cd "$working_directory" && npx tsx scripts/pipeline-cli.ts add '<json>'
+```
 
-For jobs scored SKIP (0-3), offer two options:
-- "Auto-filter all SKIPs" → adds them as `filtered` status with the reason
-- "Just ignore them" → does not add to pipeline at all
+5. Run pipeline mode on the newly added items (they will be in `pending-review`).
 
-Do not ingest SKIP jobs unless the user explicitly asks to track them.
+Supported digest formats:
+- LinkedIn job alert email (3-5 jobs with title, company, location, optional salary)
+- LinkedIn recruiter digest (multiple recruiter messages, each different role)
+- Forwarded email body
+- Pasted plain list of companies and roles
+- URLs only (ask user to paste JD text if URLs cannot be fetched)
 
-## Digest formats supported
+---
 
-- **LinkedIn job alert digest**: Usually has 3-5 jobs with title, company, location,
-  and a "See job" link. May include salary range.
-- **LinkedIn recruiter digest**: Multiple recruiter messages, each with different roles.
-  Extract each as a separate job.
-- **Email forwards**: User may forward job alert emails. Parse the email body.
-- **Pasted list**: User may just paste a list of companies and roles.
-- **URLs only**: User pastes LinkedIn job URLs. Navigate to each (if browser available)
-  or ask user to paste the JD text.
+## Scoring rubric
 
-## Handling LinkedIn job URLs
+| Criterion | Weight | What it measures |
+|-----------|--------|-----------------|
+| Role fit | 2x | Senior/staff level, AI/ML/LLM in scope, engineering not support |
+| Stack match | 1x | TypeScript, Python, React, distributed systems, AI frameworks |
+| Company quality | 1.5x | Known stage, funding, reputation |
+| Comp signal | 1x | Above floor, or unstated |
+| Strategic value | 1.5x | Resume impact, springboard potential, market positioning |
 
-If the user provides LinkedIn job URLs, try to extract job details from the URL
-parameters (job ID, company name). If insufficient, ask the user to paste the
-job description text from each link.
+Formula:
 
-Do NOT attempt to scrape LinkedIn URLs via browser automation (login walls, bot detection).
+```
+score = (role_fit*2 + stack*1 + company*1.5 + comp*1 + strategic*1.5) / 7
+```
+
+Scoring guidelines:
+- Unstated salary: 5/10 (benefit of the doubt, will verify later)
+- Junior or Mid in title: 0/10 on role fit
+- On-site only, no relocation interest: 2/10 on role fit
+- Known Series B+ or F500 with AI initiative: 8/10 on company quality
+- Unknown company: 5/10 on company quality (neutral, not penalized)
+- European remote with real AI work: strategic value bonus (thinner talent pool, easier placement)
+
+---
 
 ## CLI reference
 
-Uses the same CLI as `gaj:add`:
-
 ```bash
+# List items by status
+npx tsx scripts/pipeline-cli.ts list <status>
+
+# Update item status
+npx tsx scripts/pipeline-cli.ts status <id> <new-status> --reason "<reason>"
+
+# Add a new item
 npx tsx scripts/pipeline-cli.ts add '<json>'
+
+# Archive stale closed items
+npx tsx scripts/pipeline-cli.ts archive
+
+# Search by keyword
 npx tsx scripts/pipeline-cli.ts search '<query>'
+
+# Pipeline stats
+npx tsx scripts/pipeline-cli.ts stats
 ```
 
-## Volume guidelines
-
-- Up to 5 jobs: triage all in one pass
-- 6-10 jobs: triage in two passes (first 5, then remaining)
-- 10+ jobs: warn the user that detective research on all PURSUE picks will take time,
-  suggest processing in batches of 5
-
-## Example flow
-
-User pastes a LinkedIn digest with 4 jobs. Triage scores them: 8.1, 6.3, 4.2, 2.0.
-
-```
-TRIAGE RESULTS
-
-| # | Score | Company | Role | Signal | Action |
-|---|-------|---------|------|--------|--------|
-| 1 | 8.1 | Nexus AI | Staff Engineer, AI Platform | Series C, remote, $220k | PURSUE |
-| 2 | 6.3 | HealthGrid | Senior ML Engineer | Series A, hybrid, no salary | MAYBE |
-| 3 | 4.2 | LogiParts | AI Developer | Unknown, remote, $130k | MAYBE |
-| 4 | 2.0 | TalentBridge | Mid Software Dev | Staffing, on-site, $95k | SKIP |
-
-PURSUE: #1 gets full detective research.
-MAYBE: #2 and #3 available if you want them.
-SKIP: #4 auto-filtered (mid-level, on-site, below floor).
-
-Which ones do you want the full report on?
-```
-
-User says "1 and 2." Detective research runs in parallel on Nexus AI and HealthGrid.
-Reports presented. Jobs ingested. Responses drafted if requested.
+Valid statuses: `pending-review`, `active`, `filtered`, `filtered-match`, `applied`, `interviewing`, `offer`, `closed`, `archived`.

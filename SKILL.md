@@ -131,7 +131,7 @@ If the database does not exist, run the first-run setup:
      /gaj:negotiate        Ackerman-based salary negotiation guidance
 
    Workflow commands:
-     /gaj:triage           Batch-filter a job alert digest
+     /gaj:triage           Batch-triage pipeline or digest with tiered AI models
      /gaj:sync             Export pipeline to Google Sheets
      /gaj:profile          View or update your search profile
 
@@ -165,6 +165,10 @@ When the user gives a natural language instruction, route to the correct sub-com
 | "Update my profile" or "Change my targets" or "Edit about-me" | `gaj:profile` |
 
 If the user invokes `/gaj` without a specific task, run `gaj:stats` and present a pipeline dashboard. After the dashboard, add: "Run /gaj:help for the full command reference."
+
+## Model routing
+
+GAJ uses tiered models for token efficiency. Config lives in `~/gaj/gaj.json` under `models`. Each skill reads the config and spawns subagents at the specified model tier. Haiku handles bulk classification, Sonnet runs detective research, Opus handles external prose and strategic decisions.
 
 ## CLI tool
 
