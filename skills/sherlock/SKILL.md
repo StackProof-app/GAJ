@@ -13,6 +13,19 @@ Run deep investigative research on a company, recruiter, job listing, or any
 combination. Produces an opinionated intelligence report with evidence-backed
 red flags, compensation analysis, and a pass/pursue/dig-deeper verdict.
 
+## Model config
+
+Read `~/gaj/gaj.json` at the start of every investigation. Use:
+- `models.sherlock_dimensions` for the 5 parallel investigation subagents (default: sonnet)
+- `models.sherlock_verdict` for the final verdict synthesis (default: opus)
+
+When spawning investigation dimension subagents (recruiter analysis, company analysis,
+mystery client, compensation check, red flag detection), use the model specified by
+`models.sherlock_dimensions`.
+
+When synthesizing all dimension findings into the final narrative report and
+pass/pursue/dig-deeper verdict, use the model specified by `models.sherlock_verdict`.
+
 ## When to use
 
 - User wants to research a company before applying

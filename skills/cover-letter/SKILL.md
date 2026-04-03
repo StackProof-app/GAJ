@@ -10,6 +10,13 @@ description: |
 
 Generate a Hook/Proof/Close cover letter tailored to a specific job and company.
 
+## Model config
+
+Read `~/gaj/gaj.json` at the start. Use:
+- `models.cover_letter` for cover letter generation subagents (default: opus)
+
+The Hook/Proof/Close generation and tone matching both run at the configured model.
+
 ## When to use
 
 - User wants a cover letter for a job in their pipeline

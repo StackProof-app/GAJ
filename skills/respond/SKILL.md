@@ -10,6 +10,14 @@ description: |
 
 Assess interest level in a recruiter's outreach, draft a mode-appropriate response, and store all correspondence.
 
+## Model config
+
+Read `~/gaj/gaj.json` at the start. Use:
+- `models.respond` for response drafting subagents (default: opus)
+
+The interest assessment and response drafting both run at the configured model.
+When delegating to sherlock for detective research, sherlock uses its own model config.
+
 ## When to use
 
 - User receives a recruiter message and wants to evaluate it
